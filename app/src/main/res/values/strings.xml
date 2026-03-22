@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">F1project</string>
+    <string name="widget_description">Odliczanie do następnej sesji F1</string>
+</resources>
