@@ -36,10 +36,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.f1project.F1App
+import com.example.f1project.domain.model.DomainResult
 import com.example.f1project.ui.theme.F1Dimens
 import com.example.f1project.ui.theme.PodiumColors
 import com.example.f1project.ui.theme.getFlag
@@ -49,11 +52,18 @@ import com.example.f1project.ui.theme.teamColors
 @Composable
 fun ResultsScreen(
     onNavigateBack: () -> Unit,
-    viewModel: ResultsViewModel = viewModel()
+    viewModel: ResultsViewModel = viewModel(
+        factory = ResultsViewModel.Factory(
+            repository = (LocalContext.current.applicationContext as F1App).repository,
+            openF1Repository = (LocalContext.current.applicationContext as F1App).openF1Repository,
+            owner = LocalSavedStateRegistryOwner.current
+        )
+    )
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
     val isQualifying = remember(uiState.results) {
-        uiState.results.any { it.time2 != null }
+        uiState.results.any { it.q2 != null }
     }
     val isSprintQualifying = remember(uiState.title) {
         uiState.title.contains("Sprint Qualifying", ignoreCase = true)
@@ -92,7 +102,9 @@ fun ResultsScreen(
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
             uiState.error != null -> Box(
-                Modifier.fillMaxSize().padding(padding),
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -125,14 +137,13 @@ fun ResultsScreen(
 
 @Composable
 fun ResultItem(
-    result: DisplayResult,
+    result: DomainResult,
     isQualifying: Boolean,
     isSprintQualifying: Boolean = false
 ) {
     val teamColor = teamColors[result.constructorId]
         ?: MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-    val positionNum = result.position.toIntOrNull() ?: 99
-    val podiumColor = PodiumColors.forPosition(positionNum)
+    val podiumColor = PodiumColors.forPosition(result.position)
 
     Card(
         colors = CardDefaults.cardColors(
@@ -142,16 +153,13 @@ fun ResultItem(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
-            // Górna sekcja
             Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-                // Pasek koloru zespołu
                 Box(
                     modifier = Modifier
                         .width(F1Dimens.teamBarWidth)
                         .fillMaxHeight()
                         .background(teamColor)
                 )
-
                 Row(
                     modifier = Modifier
                         .padding(
@@ -161,16 +169,13 @@ fun ResultItem(
                         .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Pozycja — duża cyfra jak poprzednio
                     Text(
-                        text = result.position,
+                        text = result.position.toString(),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = podiumColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(F1Dimens.positionColumnWidth)
                     )
-
-                    // Nazwisko i zespół
                     Column(modifier = Modifier.weight(1f)) {
                         val flag = getFlag(result.nationality)
                         Row(
@@ -181,7 +186,7 @@ fun ResultItem(
                                 Text(text = flag, fontSize = 14.sp)
                             }
                             Text(
-                                text = result.driverName,
+                                text = result.driverFullName,
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
@@ -191,11 +196,9 @@ fun ResultItem(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-
-                    // Punkty
-                    result.points?.takeIf { it.toFloatOrNull() ?: 0f > 0 }?.let { pts ->
+                    result.points?.takeIf { it > 0.0 }?.let { pts ->
                         Text(
-                            text = "+${pts.toFloat().toInt()} PTS",
+                            text = "+${pts.toInt()} PTS",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
@@ -204,8 +207,8 @@ fun ResultItem(
                 }
             }
 
-            // Czasy
-            if (result.time1 != null) {
+            val primaryTime = if (isQualifying) result.q1 else result.timeOrStatus
+            if (primaryTime != null) {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.background,
                     thickness = F1Dimens.dividerThickness
@@ -217,7 +220,7 @@ fun ResultItem(
                     )
                 } else {
                     Text(
-                        text = result.time1,
+                        text = primaryTime,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(
@@ -235,7 +238,7 @@ fun ResultItem(
 
 @Composable
 fun QualifyingTimesRow(
-    result: DisplayResult,
+    result: DomainResult,
     isSprintQualifying: Boolean = false
 ) {
     val label1 = if (isSprintQualifying) "SQ1" else "Q1"
@@ -253,9 +256,9 @@ fun QualifyingTimesRow(
             ),
         horizontalArrangement = Arrangement.spacedBy(F1Dimens.spacingS)
     ) {
-        TimeColumn(label = label1, time = result.time1, modifier = Modifier.weight(1f))
-        TimeColumn(label = label2, time = result.time2, modifier = Modifier.weight(1f))
-        TimeColumn(label = label3, time = result.time3, modifier = Modifier.weight(1f))
+        TimeColumn(label = label1, time = result.q1, modifier = Modifier.weight(1f))
+        TimeColumn(label = label2, time = result.q2, modifier = Modifier.weight(1f))
+        TimeColumn(label = label3, time = result.q3, modifier = Modifier.weight(1f))
     }
 }
 

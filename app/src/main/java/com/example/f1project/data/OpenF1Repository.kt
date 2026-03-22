@@ -3,7 +3,7 @@ package com.example.f1project.data
 import android.util.Log
 import com.example.f1project.data.remote.OpenF1Lap
 import com.example.f1project.data.remote.OpenF1RetrofitInstance
-import com.example.f1project.ui.results.DisplayResult
+import com.example.f1project.domain.model.DomainResult
 import java.time.Instant
 
 class OpenF1Repository {
@@ -12,7 +12,7 @@ class OpenF1Repository {
         year: Int,
         round: Int,
         location: String
-    ): OpenF1Result<List<DisplayResult>> {
+    ): OpenF1Result<List<DomainResult>> {
         return try {
             val allSessions = OpenF1RetrofitInstance.api.getAllSessions(year = year)
 
@@ -39,7 +39,6 @@ class OpenF1Repository {
             val laps = OpenF1RetrofitInstance.api.getLaps(session.sessionKey)
             val drivers = OpenF1RetrofitInstance.api.getDrivers(session.sessionKey)
 
-            // LOG we właściwym miejscu — po pobraniu kierowców
             drivers.take(3).forEach { driver ->
                 Log.d("OpenF1Flag", "Kierowca: ${driver.fullName}, countryCode: '${driver.countryCode}'")
             }
@@ -67,9 +66,13 @@ class OpenF1Repository {
             val sq2BestPerDriver = bestLapPerDriver(segments[1])
             val sq3BestPerDriver = bestLapPerDriver(segments[2])
 
-            val allDriverNumbers = (sq1BestPerDriver.keys + sq2BestPerDriver.keys + sq3BestPerDriver.keys).toSet()
+            val allDriverNumbers = (
+                    sq1BestPerDriver.keys +
+                            sq2BestPerDriver.keys +
+                            sq3BestPerDriver.keys
+                    ).toSet()
 
-            val results = allDriverNumbers
+            val results: List<DomainResult> = allDriverNumbers
                 .map { driverNumber ->
                     val sq1Time = sq1BestPerDriver[driverNumber]?.lapDuration
                     val sq2Time = sq2BestPerDriver[driverNumber]?.lapDuration
@@ -81,16 +84,18 @@ class OpenF1Repository {
                 .mapIndexed { index, (driverNumber, _, times) ->
                     val driver = driversMap[driverNumber]
                     val (sq1, sq2, sq3) = times
-                    DisplayResult(
-                        position = (index + 1).toString(),
-                        driverName = driver?.fullName ?: "Kierowca #$driverNumber",
+                    // ZMIANA: DomainResult zamiast DisplayResult
+                    DomainResult(
+                        position        = index + 1,
+                        driverFullName  = driver?.fullName ?: "Kierowca #$driverNumber",
                         constructorName = driver?.teamName ?: "Nieznany zespół",
-                        constructorId = mapTeamNameToId(driver?.teamName),
-                        nationality = driver?.countryCode ?: "",
-                        points = null,
-                        time1 = sq1?.let { formatLapTime(it) },
-                        time2 = sq2?.let { formatLapTime(it) },
-                        time3 = sq3?.let { formatLapTime(it) }
+                        constructorId   = mapTeamNameToId(driver?.teamName),
+                        nationality     = driver?.countryCode ?: "",
+                        points          = null,
+                        timeOrStatus    = null,
+                        q1              = sq1?.let { formatLapTime(it) },
+                        q2              = sq2?.let { formatLapTime(it) },
+                        q3              = sq3?.let { formatLapTime(it) }
                     )
                 }
 
@@ -111,7 +116,6 @@ class OpenF1Repository {
         }
 
         val gaps = mutableListOf<Pair<Int, Long>>()
-
         for (i in 0 until sortedLaps.size - 1) {
             val currentTime = parseInstant(sortedLaps[i].dateStart) ?: continue
             val nextTime = parseInstant(sortedLaps[i + 1].dateStart) ?: continue

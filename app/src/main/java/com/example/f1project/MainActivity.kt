@@ -52,13 +52,11 @@ val bottomNavItems = listOf(
 class MainActivity : ComponentActivity() {
 
     private val seasonViewModel: SeasonViewModel by viewModels()
-    // DODANE: ThemeViewModel
     private val themeViewModel: ThemeViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            // DODANE: obserwujemy motyw
             val isDarkTheme by themeViewModel.isDarkTheme.collectAsState()
 
             F1ProjectTheme(isDarkTheme = isDarkTheme) {
@@ -104,7 +102,9 @@ class MainActivity : ComponentActivity() {
                         startDestination = Screen.Start.route,
                         modifier = Modifier.padding(innerPadding)
                     ) {
-                        composable(Screen.Start.route) { StartScreen() }
+                        composable(Screen.Start.route) {
+                            StartScreen()
+                        }
                         composable(Screen.Standings.route) {
                             StandingsScreen(
                                 seasonViewModel = seasonViewModel,
@@ -134,7 +134,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(Screen.Settings.route) {
-                            // ZMIANA: przekazujemy themeViewModel do ustawień
                             SettingsScreen(themeViewModel = themeViewModel)
                         }
                         composable(
@@ -146,7 +145,10 @@ class MainActivity : ComponentActivity() {
                                 navArgument("location") { type = NavType.StringType }
                             )
                         ) {
-                            ResultsScreen(onNavigateBack = { navController.popBackStack() })
+                            // SavedStateHandle jest wstrzykiwany automatycznie przez Navigation
+                            ResultsScreen(
+                                onNavigateBack = { navController.popBackStack() }
+                            )
                         }
                         composable(
                             route = Screen.DriverProfile.route,

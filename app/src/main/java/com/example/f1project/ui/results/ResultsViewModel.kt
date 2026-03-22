@@ -1,54 +1,42 @@
 package com.example.f1project.ui.results
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.AbstractSavedStateViewModelFactory
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.f1project.F1App
+import androidx.savedstate.SavedStateRegistryOwner
+import com.example.f1project.data.F1Repository
+import com.example.f1project.data.OpenF1Repository
 import com.example.f1project.data.OpenF1Result
+import com.example.f1project.domain.mapper.ResultsMapper
+import com.example.f1project.domain.model.DomainResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-data class DisplayResult(
-    val position: String,
-    val driverName: String,
-    val constructorName: String,
-    val constructorId: String,
-    val nationality: String,
-    val points: String?,
-    val time1: String?,
-    val time2: String?,
-    val time3: String?
-)
-
 data class ResultsUiState(
     val title: String = "Wyniki",
-    val results: List<DisplayResult> = emptyList(),
+    val results: List<DomainResult> = emptyList(),
     val isLoading: Boolean = true,
     val error: String? = null
 )
 
 class ResultsViewModel(
-    application: Application,
+    private val repository: F1Repository,
+    private val openF1Repository: OpenF1Repository,
     savedStateHandle: SavedStateHandle
-) : AndroidViewModel(application) {
+) : ViewModel() {
 
-    private val repository = (application as F1App).repository
-    private val openF1Repository = (application as F1App).openF1Repository
-
+    // SavedStateHandle dostarcza Navigation automatycznie — wyciągamy argumenty tutaj
     private val season: String = checkNotNull(savedStateHandle["season"])
     private val round: String = checkNotNull(savedStateHandle["round"])
     private val sessionType: String = checkNotNull(savedStateHandle["sessionType"])
-    // DODANE: lokalizacja przekazana przez nawigację
     private val location: String = savedStateHandle["location"] ?: ""
 
     private val _uiState = MutableStateFlow(ResultsUiState())
     val uiState = _uiState.asStateFlow()
 
-    init {
-        fetchResults()
-    }
+    init { fetchResults() }
 
     private fun fetchResults() {
         viewModelScope.launch {
@@ -72,6 +60,47 @@ class ResultsViewModel(
         }
     }
 
+    private suspend fun fetchRaceOrSprintResults(isSprint: Boolean) {
+        val response = if (isSprint) {
+            repository.getSprintResults(season, round)
+        } else {
+            repository.getRaceResults(season, round)
+        }
+        val race = response.mrData.raceTable.races?.firstOrNull()
+        if (race != null) {
+            val resultList = if (isSprint) race.sprintResults else race.results
+            val domainResults = ResultsMapper.mapRaceResultList(resultList ?: emptyList())
+            _uiState.value = ResultsUiState(
+                title = race.raceName ?: "Wyniki",
+                results = domainResults,
+                isLoading = false
+            )
+        } else {
+            _uiState.value = ResultsUiState(
+                isLoading = false,
+                error = "Brak wyników dla tej sesji."
+            )
+        }
+    }
+
+    private suspend fun fetchQualifyingResults() {
+        val response = repository.getQualifyingResults(season, round)
+        val race = response.mrData.raceTable.races.firstOrNull()
+        if (race != null) {
+            val domainResults = ResultsMapper.mapQualifyingResultList(race.qualifyingResults)
+            _uiState.value = ResultsUiState(
+                title = race.raceName ?: "Kwalifikacje",
+                results = domainResults,
+                isLoading = false
+            )
+        } else {
+            _uiState.value = ResultsUiState(
+                isLoading = false,
+                error = "Brak wyników dla kwalifikacji."
+            )
+        }
+    }
+
     private suspend fun fetchSprintQualifyingFromOpenF1() {
         val year = season.toIntOrNull() ?: run {
             _uiState.value = ResultsUiState(
@@ -88,14 +117,11 @@ class ResultsViewModel(
             return
         }
 
-        // ZMIANA: przekazujemy lokalizację do repository
         when (val result = openF1Repository.getSprintQualifyingResults(year, roundInt, location)) {
-            is OpenF1Result.Success<*> -> {
-                @Suppress("UNCHECKED_CAST")
-                val data = result.data as List<DisplayResult>
+            is OpenF1Result.Success -> {
                 _uiState.value = ResultsUiState(
                     title = "Sprint Qualifying — $location",
-                    results = data,
+                    results = result.data,
                     isLoading = false
                 )
             }
@@ -108,68 +134,20 @@ class ResultsViewModel(
         }
     }
 
-    private suspend fun fetchRaceOrSprintResults(isSprint: Boolean) {
-        val response = if (isSprint) {
-            repository.getSprintResults(season, round)
-        } else {
-            repository.getRaceResults(season, round)
-        }
-        val race = response.mrData.raceTable.races?.firstOrNull()
-        if (race != null) {
-            val resultList = if (isSprint) race.sprintResults else race.results
-            val displayResults = (resultList ?: emptyList()).map {
-                DisplayResult(
-                    position        = it.position ?: "—",
-                    driverName      = "${it.driver.givenName ?: ""} ${it.driver.familyName ?: ""}".trim(),
-                    constructorName = it.constructor.name ?: "—",
-                    constructorId   = it.constructor.constructorId ?: "",
-                    nationality     = it.driver.nationality ?: "",
-                    points          = it.points,
-                    time1           = it.time?.time ?: it.status,
-                    time2           = null,
-                    time3           = null
-                )
-            }
-            _uiState.value = ResultsUiState(
-                title     = race.raceName ?: "Wyniki",
-                results   = displayResults,
-                isLoading = false
-            )
-        } else {
-            _uiState.value = ResultsUiState(
-                isLoading = false,
-                error     = "Brak wyników dla tej sesji."
-            )
-        }
-    }
+    // AbstractSavedStateViewModelFactory — Navigation wstrzykuje SavedStateHandle automatycznie
+    class Factory(
+        private val repository: F1Repository,
+        private val openF1Repository: OpenF1Repository,
+        owner: SavedStateRegistryOwner
+    ) : AbstractSavedStateViewModelFactory(owner, null) {
 
-    private suspend fun fetchQualifyingResults() {
-        val response = repository.getQualifyingResults(season, round)
-        val race = response.mrData.raceTable.races.firstOrNull()
-        if (race != null) {
-            val displayResults = race.qualifyingResults.map {
-                DisplayResult(
-                    position        = it.position ?: "—",
-                    driverName      = "${it.driver.givenName ?: ""} ${it.driver.familyName ?: ""}".trim(),
-                    constructorName = it.constructor.name ?: "—",
-                    constructorId   = it.constructor.constructorId ?: "",
-                    nationality     = it.driver.nationality ?: "",
-                    points          = null,
-                    time1           = it.q1,
-                    time2           = it.q2,
-                    time3           = it.q3
-                )
-            }
-            _uiState.value = ResultsUiState(
-                title     = race.raceName ?: "Kwalifikacje",
-                results   = displayResults,
-                isLoading = false
-            )
-        } else {
-            _uiState.value = ResultsUiState(
-                isLoading = false,
-                error     = "Brak wyników dla kwalifikacji."
-            )
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(
+            key: String,
+            modelClass: Class<T>,
+            handle: SavedStateHandle
+        ): T {
+            return ResultsViewModel(repository, openF1Repository, handle) as T
         }
     }
 }
