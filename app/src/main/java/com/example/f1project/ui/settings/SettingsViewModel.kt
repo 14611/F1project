@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.f1project.F1App
 import com.example.f1project.data.RepositoryResult
+import com.example.f1project.domain.mapper.RaceMapper
 import com.example.f1project.notifications.NotificationScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +42,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             settingsStore.setNotificationsEnabled(enabled)
 
             if (enabled) {
-                // ZMIANA: przekazujemy bieżący sezon do getRaceSchedule()
                 val currentSeason = LocalDate.now().year.toString()
                 val result = repository.getRaceSchedule(currentSeason)
                 val races = when (result) {
@@ -50,7 +50,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     is RepositoryResult.Error -> emptyList()
                 }
                 if (races.isNotEmpty()) {
-                    NotificationScheduler.scheduleAll(getApplication(), races)
+                    // ZMIANA: mapujemy DTO → DomainRace przed przekazaniem do schedulera
+                    val domainRaces = RaceMapper.mapList(races)
+                    NotificationScheduler.scheduleAll(getApplication(), domainRaces)
                 }
             } else {
                 NotificationScheduler.cancelAll(getApplication())

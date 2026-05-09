@@ -1,10 +1,8 @@
 package com.example.f1project.ui.results
 
-import androidx.lifecycle.AbstractSavedStateViewModelFactory
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.savedstate.SavedStateRegistryOwner
 import com.example.f1project.data.F1Repository
 import com.example.f1project.data.OpenF1Repository
 import com.example.f1project.data.OpenF1Result
@@ -24,14 +22,11 @@ data class ResultsUiState(
 class ResultsViewModel(
     private val repository: F1Repository,
     private val openF1Repository: OpenF1Repository,
-    savedStateHandle: SavedStateHandle
+    private val season: String,
+    private val round: String,
+    private val sessionType: String,
+    private val location: String
 ) : ViewModel() {
-
-    // SavedStateHandle dostarcza Navigation automatycznie — wyciągamy argumenty tutaj
-    private val season: String = checkNotNull(savedStateHandle["season"])
-    private val round: String = checkNotNull(savedStateHandle["round"])
-    private val sessionType: String = checkNotNull(savedStateHandle["sessionType"])
-    private val location: String = savedStateHandle["location"] ?: ""
 
     private val _uiState = MutableStateFlow(ResultsUiState())
     val uiState = _uiState.asStateFlow()
@@ -134,20 +129,19 @@ class ResultsViewModel(
         }
     }
 
-    // AbstractSavedStateViewModelFactory — Navigation wstrzykuje SavedStateHandle automatycznie
     class Factory(
         private val repository: F1Repository,
         private val openF1Repository: OpenF1Repository,
-        owner: SavedStateRegistryOwner
-    ) : AbstractSavedStateViewModelFactory(owner, null) {
-
+        private val season: String,
+        private val round: String,
+        private val sessionType: String,
+        private val location: String
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(
-            key: String,
-            modelClass: Class<T>,
-            handle: SavedStateHandle
-        ): T {
-            return ResultsViewModel(repository, openF1Repository, handle) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            return ResultsViewModel(
+                repository, openF1Repository, season, round, sessionType, location
+            ) as T
         }
     }
 }

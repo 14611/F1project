@@ -144,10 +144,17 @@ class MainActivity : ComponentActivity() {
                                 navArgument("sessionType") { type = NavType.StringType },
                                 navArgument("location") { type = NavType.StringType }
                             )
-                        ) {
-                            // SavedStateHandle jest wstrzykiwany automatycznie przez Navigation
+                        ) { backStackEntry ->
+                            val season = backStackEntry.arguments?.getString("season") ?: ""
+                            val round = backStackEntry.arguments?.getString("round") ?: ""
+                            val sessionType = backStackEntry.arguments?.getString("sessionType") ?: ""
+                            val location = backStackEntry.arguments?.getString("location") ?: ""
                             ResultsScreen(
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateBack = { navController.popBackStack() },
+                                season = season,
+                                round = round,
+                                sessionType = sessionType,
+                                location = location
                             )
                         }
                         composable(

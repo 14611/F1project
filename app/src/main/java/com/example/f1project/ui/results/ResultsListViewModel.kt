@@ -64,19 +64,43 @@ class ResultsListViewModel(
     private fun filterFinished(races: List<Race>, season: String): List<Race> {
         val currentYear = LocalDate.now().year.toString()
         return if (season == currentYear) {
-            races.filter { it.isRaceFinished() }.reversed()
+            // ZMIANA: wyścig pojawia się gdy jakakolwiek jego sesja się skończyła
+            races.filter { it.hasAnyFinishedSession() }.reversed()
         } else {
             races.reversed()
         }
     }
 
-    private fun Race.isRaceFinished(): Boolean {
+    // ZMIANA: sprawdzamy czy jakakolwiek sesja wyścigu już się zakończyła
+    // Dzięki temu np. wyniki kwalifikacji pojawiają się od razu po kwalifikacjach,
+    // nie dopiero po zakończeniu wyścigu głównego
+    private fun Race.hasAnyFinishedSession(): Boolean {
+        val now = ZonedDateTime.now()
+
+        // Zbieramy wszystkie sesje które mają datę i czas
+        val allSessions = listOfNotNull(
+            parseDatetime(firstPractice?.date, firstPractice?.time),
+            parseDatetime(secondPractice?.date, secondPractice?.time),
+            parseDatetime(thirdPractice?.date, thirdPractice?.time),
+            parseDatetime(sprintQualifying?.date, sprintQualifying?.time),
+            parseDatetime(sprint?.date, sprint?.time),
+            parseDatetime(qualifying?.date, qualifying?.time),
+            parseDatetime(date, time)  // wyścig główny
+        )
+
+        // Wystarczy że jedna sesja się skończyła (+ 2h bufor na zakończenie)
+        return allSessions.any { sessionTime ->
+            sessionTime.plusHours(2).isBefore(now)
+        }
+    }
+
+    private fun parseDatetime(date: String?, time: String?): ZonedDateTime? {
+        if (date == null || time == null) return null
         return try {
-            if (date == null || time == null) return false
             ZonedDateTime.parse("${date}T${time}")
-                .plusHours(2)
-                .isBefore(ZonedDateTime.now())
-        } catch (e: DateTimeParseException) { false }
+        } catch (e: DateTimeParseException) {
+            null
+        }
     }
 
     companion object {

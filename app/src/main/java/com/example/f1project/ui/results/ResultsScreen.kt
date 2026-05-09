@@ -37,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -52,14 +51,27 @@ import com.example.f1project.ui.theme.teamColors
 @Composable
 fun ResultsScreen(
     onNavigateBack: () -> Unit,
-    viewModel: ResultsViewModel = viewModel(
+    // ZMIANA: argumenty przekazywane bezpośrednio z MainActivity
+    season: String,
+    round: String,
+    sessionType: String,
+    location: String
+) {
+    val context = LocalContext.current
+    val app = context.applicationContext as F1App
+
+    val viewModel: ResultsViewModel = viewModel(
+        key = "$season-$round-$sessionType",
         factory = ResultsViewModel.Factory(
-            repository = (LocalContext.current.applicationContext as F1App).repository,
-            openF1Repository = (LocalContext.current.applicationContext as F1App).openF1Repository,
-            owner = LocalSavedStateRegistryOwner.current
+            repository = app.repository,
+            openF1Repository = app.openF1Repository,
+            season = season,
+            round = round,
+            sessionType = sessionType,
+            location = location
         )
     )
-) {
+
     val uiState by viewModel.uiState.collectAsState()
 
     val isQualifying = remember(uiState.results) {
@@ -102,9 +114,7 @@ fun ResultsScreen(
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
             uiState.error != null -> Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -119,9 +129,7 @@ fun ResultsScreen(
                     vertical = F1Dimens.listPaddingV
                 ),
                 verticalArrangement = Arrangement.spacedBy(F1Dimens.listItemSpacing),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
+                modifier = Modifier.fillMaxSize().padding(padding)
             ) {
                 items(uiState.results) { result ->
                     ResultItem(
@@ -146,9 +154,7 @@ fun ResultItem(
     val podiumColor = PodiumColors.forPosition(result.position)
 
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(F1Dimens.cardCornerRadius),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -214,10 +220,7 @@ fun ResultItem(
                     thickness = F1Dimens.dividerThickness
                 )
                 if (isQualifying) {
-                    QualifyingTimesRow(
-                        result = result,
-                        isSprintQualifying = isSprintQualifying
-                    )
+                    QualifyingTimesRow(result = result, isSprintQualifying = isSprintQualifying)
                 } else {
                     Text(
                         text = primaryTime,
@@ -237,10 +240,7 @@ fun ResultItem(
 }
 
 @Composable
-fun QualifyingTimesRow(
-    result: DomainResult,
-    isSprintQualifying: Boolean = false
-) {
+fun QualifyingTimesRow(result: DomainResult, isSprintQualifying: Boolean = false) {
     val label1 = if (isSprintQualifying) "SQ1" else "Q1"
     val label2 = if (isSprintQualifying) "SQ2" else "Q2"
     val label3 = if (isSprintQualifying) "SQ3" else "Q3"
