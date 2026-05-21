@@ -9,6 +9,19 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
+    <!-- Wymagane do odbioru zdarzenia po restarcie urządzenia -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Wymagane dla setExactAndAllowWhileIdle na Android 12+ (API 31+) -->
+    <!-- Jeśli użytkownik nie przyzna — fallback do setAndAllowWhileIdle -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- NOWE: API 33+ — nie wymaga zgody użytkownika, ma priorytet nad SCHEDULE_EXACT_ALARM -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- NOWE: wymagane przez AlarmManager żeby obudzić CPU -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- NOWE: wymagane żeby ominąć Doze Mode na niektórych OEM -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
         android:name=".F1App"
         android:allowBackup="true"
@@ -46,6 +59,27 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/f1_widget_info" />
+        </receiver>
+
+        <!-- Odbiorca wyzwalanego przez AlarmManager powiadomienia -->
+        <!-- exported="false" — tylko nasz AlarmManager może go wywołać -->
+        <receiver
+            android:name=".notifications.NotificationReceiver"
+            android:exported="false" />
+
+        <!-- Odbiorca zdarzenia systemowego po restarcie urządzenia -->
+        <!-- exported="true" — musi być, bo broadcast pochodzi od systemu -->
+        <receiver
+            android:name=".notifications.BootReceiver"
+            android:exported="true">
+            android:name=".notifications.DailyNotificationReceiver"
+            android:exported="false" />
+            <intent-filter>
+                <!-- Restart urządzenia — przywróć alarmy -->
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- Aktualizacja apki — przywróć alarmy po reinstalacji -->
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
 
     </application>

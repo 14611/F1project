@@ -11,6 +11,7 @@ import com.example.f1project.domain.model.DomainResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.example.f1project.data.RepositoryResult
 
 data class ResultsUiState(
     val title: String = "Wyniki",
@@ -56,11 +57,25 @@ class ResultsViewModel(
     }
 
     private suspend fun fetchRaceOrSprintResults(isSprint: Boolean) {
-        val response = if (isSprint) {
+        // ZMIANA: rozpakowujemy RepositoryResult zamiast używać odpowiedzi bezpośrednio
+        val result = if (isSprint) {
             repository.getSprintResults(season, round)
         } else {
             repository.getRaceResults(season, round)
         }
+
+        val response = when (result) {
+            is RepositoryResult.Fresh  -> result.data
+            is RepositoryResult.Cached -> result.data
+            is RepositoryResult.Error  -> {
+                _uiState.value = ResultsUiState(
+                    isLoading = false,
+                    error = result.message
+                )
+                return
+            }
+        }
+
         val race = response.mrData.raceTable.races?.firstOrNull()
         if (race != null) {
             val resultList = if (isSprint) race.sprintResults else race.results
@@ -79,7 +94,21 @@ class ResultsViewModel(
     }
 
     private suspend fun fetchQualifyingResults() {
-        val response = repository.getQualifyingResults(season, round)
+        // ZMIANA: rozpakowujemy RepositoryResult
+        val result = repository.getQualifyingResults(season, round)
+
+        val response = when (result) {
+            is RepositoryResult.Fresh  -> result.data
+            is RepositoryResult.Cached -> result.data
+            is RepositoryResult.Error  -> {
+                _uiState.value = ResultsUiState(
+                    isLoading = false,
+                    error = result.message
+                )
+                return
+            }
+        }
+
         val race = response.mrData.raceTable.races.firstOrNull()
         if (race != null) {
             val domainResults = ResultsMapper.mapQualifyingResultList(race.qualifyingResults)

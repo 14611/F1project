@@ -39,7 +39,7 @@ class ResultsListViewModel(
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             }
 
-            when (val result = repository.getRaceSchedule(season)) {
+            when (val result = repository.getRaceSchedule(season, forceRefresh = isRefresh)) {
                 is RepositoryResult.Fresh -> _uiState.value = ResultsListUiState(
                     finishedRaces = filterFinished(result.data.mrData.raceTable.races, season),
                     isLoading = false,

@@ -1,115 +1,132 @@
 package com.example.f1project.data
 
-import com.example.f1project.data.local.CacheManager
+import android.content.Context
 import com.example.f1project.data.remote.ApiConstructorDetailResponse
 import com.example.f1project.data.remote.ApiConstructorResultsResponse
 import com.example.f1project.data.remote.ApiDriverDetailResponse
 import com.example.f1project.data.remote.ApiDriverResultsResponse
+import com.example.f1project.data.remote.ApiQualifyingResponse
 import com.example.f1project.data.remote.ApiRaceResponse
 import com.example.f1project.data.remote.ApiResponse
+import com.example.f1project.data.remote.ApiResultsResponse
+import com.example.f1project.data.remote.F1ApiService
+import com.example.f1project.data.remote.NetworkUtils
 import com.example.f1project.data.remote.RetrofitInstance
-import com.google.gson.reflect.TypeToken
 
-class F1Repository(private val cacheManager: CacheManager) {
+class F1Repository(private val context: Context) {
 
-    suspend fun getRaceSchedule(season: String): RepositoryResult<ApiRaceResponse> {
-        return fetchWithCache(
-            apiCall = { RetrofitInstance.api.getRaceSchedule(season) },
-            cacheKey = CacheManager.makeScheduleKey(season),
-            type = object : TypeToken<ApiRaceResponse>() {}.type
-        )
-    }
+    // cacheOnly=true  → apiCacheOnly  — dysk, nigdy sieć (widget)
+    // forceRefresh=true → apiRefresh — zawsze sieć (pull-to-refresh)
+    // domyślnie        → api        — sieć jeśli cache > 5 min
 
-    suspend fun getDriverStandings(season: String): RepositoryResult<ApiResponse> {
-        return fetchWithCache(
-            apiCall = { RetrofitInstance.api.getDriverStandings(season) },
-            cacheKey = CacheManager.makeDriverStandingsKey(season),
-            type = object : TypeToken<ApiResponse>() {}.type
-        )
-    }
+    suspend fun getRaceSchedule(
+        season: String,
+        forceRefresh: Boolean = false,
+        cacheOnly: Boolean = false
+    ): RepositoryResult<ApiRaceResponse> =
+        fetchWithCache(forceRefresh, cacheOnly) { it.getRaceSchedule(season) }
 
-    suspend fun getConstructorStandings(season: String): RepositoryResult<ApiResponse> {
-        return fetchWithCache(
-            apiCall = { RetrofitInstance.api.getConstructorStandings(season) },
-            cacheKey = CacheManager.makeConstructorStandingsKey(season),
-            type = object : TypeToken<ApiResponse>() {}.type
-        )
-    }
+    suspend fun getDriverStandings(
+        season: String,
+        forceRefresh: Boolean = false,
+        cacheOnly: Boolean = false
+    ): RepositoryResult<ApiResponse> =
+        fetchWithCache(forceRefresh, cacheOnly) { it.getDriverStandings(season) }
 
-    suspend fun getRaceResults(season: String, round: String) =
-        RetrofitInstance.api.getRaceResults(season, round)
+    suspend fun getConstructorStandings(
+        season: String,
+        forceRefresh: Boolean = false,
+        cacheOnly: Boolean = false
+    ): RepositoryResult<ApiResponse> =
+        fetchWithCache(forceRefresh, cacheOnly) { it.getConstructorStandings(season) }
 
-    suspend fun getQualifyingResults(season: String, round: String) =
-        RetrofitInstance.api.getQualifyingResults(season, round)
+    suspend fun getRaceResults(
+        season: String,
+        round: String,
+        forceRefresh: Boolean = false
+    ): RepositoryResult<ApiResultsResponse> =
+        fetchWithCache(forceRefresh) { it.getRaceResults(season, round) }
 
-    suspend fun getSprintResults(season: String, round: String) =
-        RetrofitInstance.api.getSprintResults(season, round)
+    suspend fun getQualifyingResults(
+        season: String,
+        round: String,
+        forceRefresh: Boolean = false
+    ): RepositoryResult<ApiQualifyingResponse> =
+        fetchWithCache(forceRefresh) { it.getQualifyingResults(season, round) }
 
-    suspend fun getSprintQualifyingResults(season: String, round: String) =
-        RetrofitInstance.api.getSprintQualifyingResults(season, round)
+    suspend fun getSprintResults(
+        season: String,
+        round: String,
+        forceRefresh: Boolean = false
+    ): RepositoryResult<ApiResultsResponse> =
+        fetchWithCache(forceRefresh) { it.getSprintResults(season, round) }
 
-    suspend fun getDriverDetail(driverId: String): RepositoryResult<ApiDriverDetailResponse> {
-        return fetchWithCache(
-            apiCall = { RetrofitInstance.api.getDriverDetail(driverId) },
-            cacheKey = CacheManager.makeDriverDetailKey(driverId),
-            type = object : TypeToken<ApiDriverDetailResponse>() {}.type
-        )
-    }
+    suspend fun getSprintQualifyingResults(
+        season: String,
+        round: String,
+        forceRefresh: Boolean = false
+    ): RepositoryResult<ApiQualifyingResponse> =
+        fetchWithCache(forceRefresh) { it.getSprintQualifyingResults(season, round) }
+
+    suspend fun getDriverDetail(
+        driverId: String,
+        forceRefresh: Boolean = false
+    ): RepositoryResult<ApiDriverDetailResponse> =
+        fetchWithCache(forceRefresh) { it.getDriverDetail(driverId) }
 
     suspend fun getDriverSeasonResults(
         season: String,
-        driverId: String
-    ): RepositoryResult<ApiDriverResultsResponse> {
-        return fetchWithCache(
-            apiCall = { RetrofitInstance.api.getDriverSeasonResults(season, driverId) },
-            cacheKey = CacheManager.makeDriverResultsKey(season, driverId),
-            type = object : TypeToken<ApiDriverResultsResponse>() {}.type
-        )
-    }
+        driverId: String,
+        forceRefresh: Boolean = false
+    ): RepositoryResult<ApiDriverResultsResponse> =
+        fetchWithCache(forceRefresh) { it.getDriverSeasonResults(season, driverId) }
 
     suspend fun getConstructorDetail(
-        constructorId: String
-    ): RepositoryResult<ApiConstructorDetailResponse> {
-        return fetchWithCache(
-            apiCall = { RetrofitInstance.api.getConstructorDetail(constructorId) },
-            cacheKey = CacheManager.makeConstructorDetailKey(constructorId),
-            type = object : TypeToken<ApiConstructorDetailResponse>() {}.type
-        )
-    }
+        constructorId: String,
+        forceRefresh: Boolean = false
+    ): RepositoryResult<ApiConstructorDetailResponse> =
+        fetchWithCache(forceRefresh) { it.getConstructorDetail(constructorId) }
 
     suspend fun getConstructorSeasonResults(
         season: String,
-        constructorId: String
-    ): RepositoryResult<ApiConstructorResultsResponse> {
-        return fetchWithCache(
-            apiCall = { RetrofitInstance.api.getConstructorSeasonResults(season, constructorId) },
-            cacheKey = CacheManager.makeConstructorResultsKey(season, constructorId),
-            type = object : TypeToken<ApiConstructorResultsResponse>() {}.type
-        )
-    }
+        constructorId: String,
+        forceRefresh: Boolean = false
+    ): RepositoryResult<ApiConstructorResultsResponse> =
+        fetchWithCache(forceRefresh) { it.getConstructorSeasonResults(season, constructorId) }
 
+    // ─────────────────────────────────────────────────────────────────────────
     private suspend fun <T> fetchWithCache(
-        apiCall: suspend () -> T,
-        cacheKey: androidx.datastore.preferences.core.Preferences.Key<String>,
-        type: java.lang.reflect.Type
+        forceRefresh: Boolean = false,
+        cacheOnly: Boolean = false,
+        apiCall: suspend (F1ApiService) -> T
     ): RepositoryResult<T> {
+        val service = when {
+            cacheOnly    -> RetrofitInstance.apiCacheOnly
+            forceRefresh -> RetrofitInstance.apiRefresh
+            else         -> RetrofitInstance.api
+        }
+        val online = NetworkUtils.isOnline(context)
         return try {
-            val data = apiCall()
-            cacheManager.save(cacheKey, data)
-            RepositoryResult.Fresh(data)
-        } catch (e: Exception) {
-            val cached: T? = cacheManager.load(cacheKey, type)
-            if (cached != null) {
-                RepositoryResult.Cached(cached)
-            } else {
-                RepositoryResult.Error(e.message ?: "Nieznany błąd")
+            val data = apiCall(service)
+            when {
+                cacheOnly -> RepositoryResult.Cached(data)
+                online    -> RepositoryResult.Fresh(data)
+                else      -> RepositoryResult.Cached(data)
             }
+        } catch (e: Exception) {
+            RepositoryResult.Error(
+                when {
+                    cacheOnly -> "Brak danych w cache"
+                    online    -> "Błąd serwera: ${e.message}"
+                    else      -> "Brak połączenia i brak danych w cache"
+                }
+            )
         }
     }
 }
 
 sealed class RepositoryResult<out T> {
-    data class Fresh<T>(val data: T) : RepositoryResult<T>()
-    data class Cached<T>(val data: T) : RepositoryResult<T>()
+    data class Fresh<T>(val data: T)      : RepositoryResult<T>()
+    data class Cached<T>(val data: T)     : RepositoryResult<T>()
     data class Error(val message: String) : RepositoryResult<Nothing>()
 }

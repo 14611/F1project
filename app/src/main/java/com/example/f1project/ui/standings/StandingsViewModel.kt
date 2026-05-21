@@ -39,8 +39,8 @@ class StandingsViewModel(
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             }
 
-            val driverResult = repository.getDriverStandings(season)
-            val constructorResult = repository.getConstructorStandings(season)
+            val driverResult = repository.getDriverStandings(season, forceRefresh = isRefresh)
+            val constructorResult = repository.getConstructorStandings(season, forceRefresh = isRefresh)
 
             val drivers = when (driverResult) {
                 is RepositoryResult.Fresh -> StandingsMapper.mapDriverList(
