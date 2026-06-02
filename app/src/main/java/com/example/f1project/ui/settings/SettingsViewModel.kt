@@ -96,7 +96,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     NotificationScheduler.scheduleAll(getApplication(), RaceMapper.mapList(races))
                 }
             } else {
-                NotificationScheduler.cancelAll(getApplication())
+                NotificationScheduler.cancelCurrent(getApplication())
             }
         }
     }

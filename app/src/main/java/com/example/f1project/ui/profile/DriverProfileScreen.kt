@@ -97,7 +97,7 @@ fun DriverProfileScreen(
                 item { DriverInfoCard(profile = profile) }
                 item {
                     SeasonStatsCard(
-                        points = profile.seasonStats.points,
+                        points = profile.seasonStats.points.toInt(),
                         wins = profile.seasonStats.wins,
                         podiums = profile.seasonStats.podiums
                     )

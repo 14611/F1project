@@ -61,23 +61,22 @@
                 android:resource="@xml/f1_widget_info" />
         </receiver>
 
-        <!-- Odbiorca wyzwalanego przez AlarmManager powiadomienia -->
-        <!-- exported="false" — tylko nasz AlarmManager może go wywołać -->
+        <!-- Powiadomienie przed sesją — wyzwalane przez AlarmManager -->
         <receiver
             android:name=".notifications.NotificationReceiver"
             android:exported="false" />
 
-        <!-- Odbiorca zdarzenia systemowego po restarcie urządzenia -->
-        <!-- exported="true" — musi być, bo broadcast pochodzi od systemu -->
+        <!-- Codzienne powiadomienie — wyzwalane przez AlarmManager -->
+        <receiver
+            android:name=".notifications.DailyNotificationReceiver"
+            android:exported="false" />
+
+        <!-- Wznowienie alarmów po restarcie urządzenia -->
         <receiver
             android:name=".notifications.BootReceiver"
             android:exported="true">
-            android:name=".notifications.DailyNotificationReceiver"
-            android:exported="false" />
             <intent-filter>
-                <!-- Restart urządzenia — przywróć alarmy -->
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <!-- Aktualizacja apki — przywróć alarmy po reinstalacji -->
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>

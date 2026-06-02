@@ -6,7 +6,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -26,6 +30,7 @@ import com.example.f1project.ui.standings.StandingsScreen
 import com.example.f1project.ui.start.StartScreen
 import com.example.f1project.ui.theme.F1ProjectTheme
 import com.example.f1project.ui.theme.ThemeViewModel
+import androidx.activity.enableEdgeToEdge
 
 sealed class Screen(val route: String) {
     object Start : Screen("start")
@@ -42,7 +47,7 @@ data class BottomNavItem(val screen: Screen, val label: String, val icon: ImageV
 
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Start, "Start", Icons.Default.Home),
-    BottomNavItem(Screen.Standings, "Klasyfikacja", Icons.Default.List),
+    BottomNavItem(Screen.Standings, "Klasyfikacja", Icons.AutoMirrored.Filled.List), // Poprawione
     BottomNavItem(Screen.Calendar, "Kalendarz", Icons.Default.DateRange),
     BottomNavItem(Screen.ResultsList, "Wyniki", Icons.Default.CheckCircle),
     BottomNavItem(Screen.Settings, "Ustawienia", Icons.Default.Settings)
@@ -56,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             val isDarkTheme by themeViewModel.isDarkTheme.collectAsState()
 

@@ -31,7 +31,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+// ZMIANA: rememberSaveable zamiast remember
+// Powód: remember resetuje stan przy obrocie ekranu (rekompozycja Activity),
+// rememberSaveable przywraca isVisible=true po obrocie jeśli dane już były widoczne
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,9 +59,11 @@ fun CalendarScreen(
         )
     )
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState       by viewModel.uiState.collectAsState()
     val selectedSeason by seasonViewModel.selectedSeason.collectAsState()
-    var isVisible by remember { mutableStateOf(false) }
+
+    // ZMIANA: rememberSaveable — przeżywa obrót ekranu
+    var isVisible by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(selectedSeason) {
         isVisible = false
@@ -82,10 +87,10 @@ fun CalendarScreen(
     Scaffold(
         topBar = {
             SeasonTopBar(
-                selectedSeason = selectedSeason,
+                selectedSeason   = selectedSeason,
                 availableSeasons = seasonViewModel.availableSeasons,
                 onSeasonSelected = { seasonViewModel.selectSeason(it) },
-                title = "Kalendarz"
+                title            = "Kalendarz"
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -98,23 +103,23 @@ fun CalendarScreen(
             contentAlignment = Alignment.Center
         ) {
             when {
-                uiState.isLoading -> CircularProgressIndicator(
+                uiState.isLoading  -> CircularProgressIndicator(
                     color = MaterialTheme.colorScheme.primary
                 )
                 uiState.error != null -> Text(
-                    text = uiState.error!!,
+                    text  = uiState.error!!,
                     color = MaterialTheme.colorScheme.error
                 )
                 else -> AnimatedVisibility(
                     visible = isVisible,
-                    enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 })
+                    enter   = fadeIn() + slideInVertically(initialOffsetY = { it / 4 })
                 ) {
                     Column {
                         if (uiState.isFromCache) CacheBanner()
                         LazyColumn(
                             contentPadding = PaddingValues(
                                 horizontal = F1Dimens.listPaddingH,
-                                vertical = F1Dimens.listPaddingV
+                                vertical   = F1Dimens.listPaddingV
                             ),
                             verticalArrangement = Arrangement.spacedBy(F1Dimens.spacingL)
                         ) {
@@ -126,10 +131,10 @@ fun CalendarScreen(
                 }
             }
             PullToRefreshContainer(
-                state = pullRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter),
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary
+                state            = pullRefreshState,
+                modifier         = Modifier.align(Alignment.TopCenter),
+                containerColor   = MaterialTheme.colorScheme.surface,
+                contentColor     = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -139,15 +144,15 @@ fun CalendarScreen(
 fun CacheBanner(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.tertiaryContainer
+        color    = MaterialTheme.colorScheme.tertiaryContainer
     ) {
         Text(
-            text = "Brak połączenia — wyświetlam ostatnio zapisane dane",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            text     = "Brak połączenia — wyświetlam ostatnio zapisane dane",
+            style    = MaterialTheme.typography.labelSmall,
+            color    = MaterialTheme.colorScheme.onTertiaryContainer,
             modifier = Modifier.padding(
                 horizontal = F1Dimens.spacingL,
-                vertical = F1Dimens.spacingS
+                vertical   = F1Dimens.spacingS
             )
         )
     }
@@ -156,45 +161,43 @@ fun CacheBanner(modifier: Modifier = Modifier) {
 @Composable
 fun RaceCard(race: DomainRace) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(F1Dimens.cardCornerRadius),
+        modifier  = Modifier.fillMaxWidth(),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape     = RoundedCornerShape(F1Dimens.cardCornerRadius),
         elevation = CardDefaults.cardElevation(defaultElevation = F1Dimens.cardElevation)
     ) {
         Column(
             modifier = Modifier.padding(
                 horizontal = F1Dimens.cardPaddingH,
-                vertical = F1Dimens.cardPaddingV
+                vertical   = F1Dimens.cardPaddingV
             )
         ) {
             Text(
-                text = "RUNDA ${race.round}",
+                text  = "RUNDA ${race.round}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = race.name,
-                style = MaterialTheme.typography.headlineMedium,
+                text     = race.name,
+                style    = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(top = F1Dimens.spacingXs)
             )
             Text(
-                text = "${race.circuitName}, ${race.country}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text     = "${race.circuitName}, ${race.country}",
+                style    = MaterialTheme.typography.bodyLarge,
+                color    = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = F1Dimens.spacingXs)
             )
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = F1Dimens.spacingL),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                modifier  = Modifier.padding(vertical = F1Dimens.spacingL),
+                color     = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 thickness = F1Dimens.dividerThickness
             )
             race.sessions.forEach { session ->
                 SessionInfo(
-                    name = session.name,
-                    date = session.date,
-                    time = session.time,
+                    name   = session.name,
+                    date   = session.date,
+                    time   = session.time,
                     isRace = session.isRace
                 )
             }
@@ -214,19 +217,18 @@ fun SessionInfo(
             .fillMaxWidth()
             .padding(vertical = F1Dimens.spacingXs),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment     = Alignment.CenterVertically
     ) {
         Text(
-            text = name,
-            style = MaterialTheme.typography.bodyLarge,
+            text       = name,
+            style      = MaterialTheme.typography.bodyLarge,
             fontWeight = if (isRace) FontWeight.Bold else FontWeight.Normal
         )
         Text(
-            text = formatUtcDateTime(date, time),
-            style = MaterialTheme.typography.bodyLarge,
+            text       = formatUtcDateTime(date, time),
+            style      = MaterialTheme.typography.bodyLarge,
             fontWeight = if (isRace) FontWeight.Bold else FontWeight.Normal,
-            color = if (isRace) MaterialTheme.colorScheme.primary
-            else LocalContentColor.current
+            color      = if (isRace) MaterialTheme.colorScheme.primary else LocalContentColor.current
         )
     }
 }

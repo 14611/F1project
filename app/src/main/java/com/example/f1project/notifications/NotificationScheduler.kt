@@ -12,140 +12,108 @@ import java.util.concurrent.TimeUnit
 object NotificationScheduler {
 
     private const val NOTIFY_MINUTES_BEFORE = 30L
-    private const val PREFS_NAME = "f1_alarm_prefs"
-    private const val KEY_CODES  = "alarm_request_codes"
 
-    // Deterministyczne indeksy sesji — hashCode() nie jest stabilny między buildami
-    private val SESSION_INDEX = mapOf(
-        "Trening 1"         to 0,
-        "Trening 2"         to 1,
-        "Trening 3"         to 2,
-        "Kwal. do Sprintu"  to 3,
-        "Sprint"            to 4,
-        "Kwalifikacje (GP)" to 5,
-        "Wyścig"            to 6
-    )
+    // Stały requestCode — jeden aktywny alarm sesyjny naraz
+    // Nowy alarm nadpisuje stary przez FLAG_UPDATE_CURRENT
+    private const val REQUEST_CODE = 1001
 
+    const val EXTRA_SESSION_NAME   = "session_name"
+    const val EXTRA_RACE_NAME      = "race_name"
+    const val EXTRA_MINUTES_BEFORE = "minutes_before"
+
+    // ZMIANA: zamiast planować 100+ alarmów jednocześnie (LimitExceededException na API 31+),
+    // wyznaczamy JEDNĄ najbliższą przyszłą sesję i ustawiamy dla niej jeden alarm.
+    // NotificationReceiver po odpaleniu wywołuje scheduleNext(), który planuje kolejny alarm.
+    // Łańcuch: alarm → pokazuje powiadomienie → planuje alarm dla następnej sesji → ...
     fun scheduleAll(context: Context, races: List<DomainRace>) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-        // Zawsze anuluj stare alarmy przed zaplanowaniem nowych
-        // (np. gdy użytkownik zmienia sezon lub odświeża harmonogram)
-        cancelAll(context)
-
         val now = System.currentTimeMillis()
-        val scheduledCodes = mutableSetOf<String>()
 
-        races.forEach { race ->
-            race.sessions.forEach { session ->
-                val sessionMs = parseToEpochMs(session.date, session.time) ?: return@forEach
-                val notifyAtMs = sessionMs - TimeUnit.MINUTES.toMillis(NOTIFY_MINUTES_BEFORE)
-
-                if (notifyAtMs <= now) return@forEach // sesja już minęła
-
-                val requestCode = generateRequestCode(race.round, session.name)
-                scheduledCodes.add(requestCode.toString())
-
-                val pendingIntent = buildPendingIntent(
-                    context, requestCode, session.name, race.name
-                )
-
-                setAlarm(alarmManager, notifyAtMs, pendingIntent)
+        // Zbieramy wszystkie przyszłe sesje ze wszystkich wyścigów
+        val nextSession = races
+            .flatMap { race ->
+                race.sessions.mapNotNull { session ->
+                    val sessionMs = parseToEpochMs(session.date, session.time)
+                        ?: return@mapNotNull null
+                    val notifyAtMs = sessionMs - TimeUnit.MINUTES.toMillis(NOTIFY_MINUTES_BEFORE)
+                    if (notifyAtMs <= now) return@mapNotNull null
+                    // Triple: (czas powiadomienia, nazwa sesji, nazwa wyścigu)
+                    Triple(notifyAtMs, session.name, race.name)
+                }
             }
+            .minByOrNull { it.first } // chronologicznie najbliższa
+
+        if (nextSession == null) {
+            cancelCurrent(context)
+            return
         }
 
-        // Zapisz kody requestCode żeby można było anulować alarmy bez listy wyścigów
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putStringSet(KEY_CODES, scheduledCodes)
-            .apply()
+        val (triggerMs, sessionName, raceName) = nextSession
+        scheduleOne(context, triggerMs, sessionName, raceName)
     }
 
-    fun cancelAll(context: Context) {
+    // Wołane przez NotificationReceiver po pokazaniu powiadomienia —
+    // planuje alarm dla kolejnej sesji w łańcuchu
+    fun scheduleNext(context: Context, races: List<DomainRace>) {
+        scheduleAll(context, races)
+    }
+
+    fun cancelCurrent(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val codes = prefs.getStringSet(KEY_CODES, emptySet()) ?: emptySet()
-
-        codes.forEach { codeStr ->
-            val code = codeStr.toIntOrNull() ?: return@forEach
-            val intent = Intent(context, NotificationReceiver::class.java)
-            // FLAG_NO_CREATE: zwróć null zamiast tworzyć nowy PendingIntent
-            val pi = PendingIntent.getBroadcast(
-                context, code, intent,
-                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-            )
-            pi?.let { alarmManager.cancel(it) }
-        }
-
-        prefs.edit().remove(KEY_CODES).apply()
+        alarmManager.cancel(buildPendingIntent(context, "", ""))
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Hierarchia wyboru metody alarmowej:
-    //
-    // Android 12+ bez uprawnienia SCHEDULE_EXACT_ALARM
-    //   → setAndAllowWhileIdle()  — inexact, może się spóźnić kilka minut,
-    //     ale DZIAŁA w Doze Mode (WorkManager nie gwarantuje tego)
-    //
-    // Android 6-11 lub Android 12+ z uprawnieniem
-    //   → setExactAndAllowWhileIdle() — exact + działa w Doze Mode
-    //
-    // Android < 6 (minSdk=24, więc niemożliwe — dla kompletności)
-    //   → setExact()
-    // ─────────────────────────────────────────────────────────────────────────
-    private fun setAlarm(alarmManager: AlarmManager, triggerAtMs: Long, pi: PendingIntent) {
+
+    private fun scheduleOne(
+        context: Context,
+        triggerMs: Long,
+        sessionName: String,
+        raceName: String
+    ) {
+        val alarmManager  = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pendingIntent = buildPendingIntent(context, sessionName, raceName)
+
+        // Anuluj poprzedni alarm przed zaplanowaniem nowego
+        alarmManager.cancel(pendingIntent)
+
         when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                    !alarmManager.canScheduleExactAlarms() -> {
-                // Fallback: użytkownik nie przyznał SCHEDULE_EXACT_ALARM
+                    !alarmManager.canScheduleExactAlarms() ->
                 alarmManager.setAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP, triggerAtMs, pi
+                    AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent
                 )
-            }
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
-                // Preferowane: exact + działa w Doze Mode
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
                 alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP, triggerAtMs, pi
+                    AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent
                 )
-            }
-            else -> {
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMs, pi)
-            }
+            else ->
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent)
         }
     }
 
     private fun buildPendingIntent(
         context: Context,
-        requestCode: Int,
         sessionName: String,
         raceName: String
     ): PendingIntent {
         val intent = Intent(context, NotificationReceiver::class.java).apply {
-            putExtra(NotificationReceiver.KEY_SESSION_NAME, sessionName)
-            putExtra(NotificationReceiver.KEY_RACE_NAME, raceName)
-            putExtra(NotificationReceiver.KEY_MINUTES_BEFORE, NOTIFY_MINUTES_BEFORE.toInt())
+            putExtra(EXTRA_SESSION_NAME,   sessionName)
+            putExtra(EXTRA_RACE_NAME,      raceName)
+            putExtra(EXTRA_MINUTES_BEFORE, NOTIFY_MINUTES_BEFORE.toInt())
         }
+        // FLAG_UPDATE_CURRENT — nowe dane nadpisują stary alarm o tym samym requestCode
         return PendingIntent.getBroadcast(
             context,
-            requestCode,
+            REQUEST_CODE,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-    }
-
-    // round (1-24) * 10 + sessionIdx (0-6) = unikalne kody 10..246
-    // Deterministyczne — ten sam wynik zawsze dla tej samej sesji
-    private fun generateRequestCode(round: Int, sessionName: String): Int {
-        val sessionIdx = SESSION_INDEX[sessionName] ?: (sessionName.length % 10)
-        return round * 10 + sessionIdx
     }
 
     private fun parseToEpochMs(date: String?, time: String?): Long? {
         if (date == null || time == null) return null
         return try {
             ZonedDateTime.parse("${date}T${time}").toInstant().toEpochMilli()
-        } catch (e: Exception) {
-            null
-        }
+        } catch (_: Exception) { null }
     }
 }

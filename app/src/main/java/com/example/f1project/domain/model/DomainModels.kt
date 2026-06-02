@@ -1,17 +1,15 @@
 package com.example.f1project.domain.model
 
-// --- Kierowca ---
 data class DomainDriver(
     val driverId: String,
-    val fullName: String,           // już połączone imię + nazwisko
-    val code: String,               // np. "VER"
+    val fullName: String,
+    val code: String,
     val number: String,
     val nationality: String,
     val dateOfBirth: String,
     val wikipediaUrl: String
 )
 
-// --- Konstruktor / Zespół ---
 data class DomainConstructor(
     val constructorId: String,
     val name: String,
@@ -19,7 +17,6 @@ data class DomainConstructor(
     val wikipediaUrl: String
 )
 
-// --- Pozycja w klasyfikacji kierowców ---
 data class DomainDriverStanding(
     val position: Int,
     val points: Double,
@@ -28,7 +25,6 @@ data class DomainDriverStanding(
     val constructor: DomainConstructor?
 )
 
-// --- Pozycja w klasyfikacji konstruktorów ---
 data class DomainConstructorStanding(
     val position: Int,
     val points: Double,
@@ -36,7 +32,6 @@ data class DomainConstructorStanding(
     val constructor: DomainConstructor
 )
 
-// --- Wyścig w kalendarzu ---
 data class DomainRace(
     val season: String,
     val round: Int,
@@ -49,7 +44,6 @@ data class DomainRace(
     val sessions: List<DomainSession>
 )
 
-// --- Sesja (trening, kwalifikacje, wyścig) ---
 data class DomainSession(
     val name: String,
     val date: String?,
@@ -57,7 +51,6 @@ data class DomainSession(
     val isRace: Boolean = false
 )
 
-// --- Wynik wyścigu / kwalifikacji ---
 data class DomainResult(
     val position: Int,
     val driverFullName: String,
@@ -65,13 +58,12 @@ data class DomainResult(
     val constructorId: String,
     val nationality: String,
     val points: Double?,
-    val timeOrStatus: String?,  // czas wyścigu lub status np. "DNF"
-    val q1: String?,            // null jeśli nie kwalifikacje
+    val timeOrStatus: String?,
+    val q1: String?,
     val q2: String?,
     val q3: String?
 )
 
-// --- Profil kierowcy (szczegóły) ---
 data class DomainDriverProfile(
     val driver: DomainDriver,
     val currentTeam: String,
@@ -79,21 +71,22 @@ data class DomainDriverProfile(
     val raceResults: List<DomainRaceResult>
 )
 
-// --- Profil konstruktora (szczegóły) ---
 data class DomainConstructorProfile(
     val constructor: DomainConstructor,
     val seasonStats: DomainSeasonStats,
     val raceResults: List<DomainConstructorRaceResult>
 )
 
-// --- Statystyki sezonu ---
+// ZMIANA: points zmienione z Int na Double
+// Powód: F1 przyznaje 0.5 punktu za najszybsze okrążenie oraz
+// historycznie stosowało punkty ułamkowe (np. sezon 1961 — 0.5 pkt)
+// Używanie Int cicho ucinało ułamki przez .toInt()
 data class DomainSeasonStats(
-    val points: Int,
+    val points: Double,   // było: Int
     val wins: Int,
     val podiums: Int
 )
 
-// --- Wynik wyścigu kierowcy ---
 data class DomainRaceResult(
     val round: Int,
     val raceName: String,
@@ -103,7 +96,6 @@ data class DomainRaceResult(
     val status: String
 )
 
-// --- Wynik wyścigu konstruktora ---
 data class DomainConstructorRaceResult(
     val round: Int,
     val raceName: String,

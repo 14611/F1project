@@ -44,7 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +62,7 @@ import com.example.f1project.ui.season.SeasonTopBar
 import com.example.f1project.ui.season.SeasonViewModel
 import com.example.f1project.ui.theme.F1Dimens
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultsListScreen(
@@ -75,8 +76,8 @@ fun ResultsListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedSeason by seasonViewModel.selectedSeason.collectAsState()
-    var isVisible by remember { mutableStateOf(false) }
-    var expandedRaceRound by remember { mutableStateOf<String?>(null) }
+    var isVisible by rememberSaveable { mutableStateOf(false) }
+    var expandedRaceRound by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(selectedSeason) {
         isVisible = false
@@ -167,7 +168,7 @@ fun ResultRaceCard(
     onHeaderClick: () -> Unit,
     onSessionClick: (season: String, round: String, sessionType: String, location: String) -> Unit
 ) {
-    val availableSessions = remember(race) {
+    val availableSessions = rememberSaveable(race) {
         buildList {
             add(SessionType.QUALIFYING)
             if (race.sprintQualifying != null) add(SessionType.SPRINT_QUALIFYING)

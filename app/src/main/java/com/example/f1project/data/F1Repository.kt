@@ -11,32 +11,44 @@ import com.example.f1project.data.remote.ApiResponse
 import com.example.f1project.data.remote.ApiResultsResponse
 import com.example.f1project.data.remote.F1ApiService
 import com.example.f1project.data.remote.NetworkUtils
-import com.example.f1project.data.remote.RetrofitInstance
 
-class F1Repository(private val context: Context) {
-
-    // cacheOnly=true  → apiCacheOnly  — dysk, nigdy sieć (widget)
-    // forceRefresh=true → apiRefresh — zawsze sieć (pull-to-refresh)
-    // domyślnie        → api        — sieć jeśli cache > 5 min
+// ZMIANA: F1ApiService wstrzykiwane przez konstruktor zamiast pobierania ze statycznego singletona
+//
+// Zalety:
+//   1. Dependency Inversion — Repository zależy od interfejsu F1ApiService, nie od RetrofitInstance
+//   2. Testowalność — w testach jednostkowych wystarczy przekazać mockk<F1ApiService>()
+//      zamiast mockować statyczny obiekt
+//   3. Gotowość na Hilt/Koin — DI framework wstrzyknie implementacje automatycznie
+//
+// Trzy osobne instancje dla różnych strategii cache:
+//   normalApi    — OkHttp waliduje max-age (5 min)
+//   refreshApi   — FORCE_NETWORK, omija cache
+//   cacheOnlyApi — only-if-cached, nigdy nie wychodzi do sieci (widget)
+class F1Repository(
+    private val context: Context,
+    private val normalApi: F1ApiService,
+    private val refreshApi: F1ApiService,
+    private val cacheOnlyApi: F1ApiService
+) {
 
     suspend fun getRaceSchedule(
         season: String,
         forceRefresh: Boolean = false,
-        cacheOnly: Boolean = false
+        cacheOnly: Boolean    = false
     ): RepositoryResult<ApiRaceResponse> =
         fetchWithCache(forceRefresh, cacheOnly) { it.getRaceSchedule(season) }
 
     suspend fun getDriverStandings(
         season: String,
         forceRefresh: Boolean = false,
-        cacheOnly: Boolean = false
+        cacheOnly: Boolean    = false
     ): RepositoryResult<ApiResponse> =
         fetchWithCache(forceRefresh, cacheOnly) { it.getDriverStandings(season) }
 
     suspend fun getConstructorStandings(
         season: String,
         forceRefresh: Boolean = false,
-        cacheOnly: Boolean = false
+        cacheOnly: Boolean    = false
     ): RepositoryResult<ApiResponse> =
         fetchWithCache(forceRefresh, cacheOnly) { it.getConstructorStandings(season) }
 
@@ -95,15 +107,18 @@ class F1Repository(private val context: Context) {
         fetchWithCache(forceRefresh) { it.getConstructorSeasonResults(season, constructorId) }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // ZMIANA: wybiera właściwy serwis na podstawie flag,
+    // zamiast odwoływać się bezpośrednio do RetrofitInstance
+    // ─────────────────────────────────────────────────────────────────────────
     private suspend fun <T> fetchWithCache(
         forceRefresh: Boolean = false,
-        cacheOnly: Boolean = false,
+        cacheOnly: Boolean    = false,
         apiCall: suspend (F1ApiService) -> T
     ): RepositoryResult<T> {
         val service = when {
-            cacheOnly    -> RetrofitInstance.apiCacheOnly
-            forceRefresh -> RetrofitInstance.apiRefresh
-            else         -> RetrofitInstance.api
+            cacheOnly    -> cacheOnlyApi
+            forceRefresh -> refreshApi
+            else         -> normalApi
         }
         val online = NetworkUtils.isOnline(context)
         return try {
@@ -126,7 +141,7 @@ class F1Repository(private val context: Context) {
 }
 
 sealed class RepositoryResult<out T> {
-    data class Fresh<T>(val data: T)      : RepositoryResult<T>()
-    data class Cached<T>(val data: T)     : RepositoryResult<T>()
-    data class Error(val message: String) : RepositoryResult<Nothing>()
+    data class Fresh<T>(val data: T)            : RepositoryResult<T>()
+    data class Cached<T>(val data: T)           : RepositoryResult<T>()
+    data class Error(val message: String)        : RepositoryResult<Nothing>()
 }

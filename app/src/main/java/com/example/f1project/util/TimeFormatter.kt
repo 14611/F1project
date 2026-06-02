@@ -9,7 +9,7 @@ import java.util.Locale
 
 object TimeFormatter {
 
-    private val PL = Locale("pl", "PL")
+    private val PL = Locale.forLanguageTag("pl-PL")
 
     private val SESSION_FORMATTER    = DateTimeFormatter.ofPattern("EEE, d MMM, HH:mm", PL)
     private val DATE_LONG_FORMATTER  = DateTimeFormatter.ofPattern("d MMMM yyyy", PL)
